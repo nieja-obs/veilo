@@ -7,14 +7,13 @@
   <link rel="icon" href="logo.png" type="image/png">
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
 </head>
 <body>
 
   <!-- Ekran logowania -->
   <div id="nickname-screen">
     <img src="logo.png" width="50" height="50">
-    <h2>Witaj w veilo!</h2>
+    <h2>Witaj w Veilo!</h2>
     <input type="text" id="nickname-input" placeholder="Twój nick..." />
     <button onclick="enterChat()">Dołącz</button>
   </div>
@@ -24,17 +23,13 @@
     <!-- Sidebar użytkowników -->
     <div id="sidebar">
       <h3>Użytkownicy</h3>
-      <ul id="user-list">
-        <!-- Lista użytkowników -->
-      </ul>
+      <ul id="user-list"></ul>
     </div>
 
     <!-- Główna część czatu -->
     <div id="chat-main">
       <div class="header">Veilo</div>
-      <ul id="messages">
-        <!-- Wiadomości -->
-      </ul>
+      <ul id="messages"></ul>
       <div id="typing-indicator"></div>
       <form onsubmit="sendMessage(event)">
         <input type="text" id="message-input" placeholder="Napisz wiadomość..." autocomplete="off" />
@@ -43,41 +38,75 @@
     </div>
   </div>
 
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+
   <script>
+    const socket = io(); // połączenie z serwerem Socket.IO
     let nickname = "";
 
+    // ======== Logowanie ========
     function enterChat() {
       const input = document.getElementById("nickname-input");
       if (input.value.trim() !== "") {
         nickname = input.value.trim();
 
-        // Ukrycie logowania i pokazanie czatu
+        // ukryj ekran logowania i pokaż czat
         document.getElementById("nickname-screen").style.display = "none";
         document.getElementById("chat-screen").style.display = "flex";
 
-        // Dodanie nicku do listy użytkowników
-        const userList = document.getElementById("user-list");
-        const userItem = document.createElement("li");
-        userItem.textContent = `${nickname} (Ty)`;
-        userList.appendChild(userItem);
+        // powiadom serwer, że użytkownik dołączył
+        socket.emit('join', nickname);
       }
     }
 
-
+    // ======== Wysyłanie wiadomości ========
     function sendMessage(event) {
       event.preventDefault();
       const input = document.getElementById("message-input");
       const message = input.value.trim();
       if (message !== "") {
-        const msgList = document.getElementById("messages");
-        const newMsg = document.createElement("li");
-        newMsg.classList.add("self");
-        newMsg.innerHTML = `<strong>${nickname}:</strong> ${message}`;
-        msgList.appendChild(newMsg);
+        // wyślij wiadomość do serwera
+        socket.emit('chat message', { user: nickname, text: message });
         input.value = "";
-        msgList.scrollTop = msgList.scrollHeight;
+        socket.emit('stop typing', nickname);
       }
     }
+
+    // ======== Odbieranie wiadomości ========
+    socket.on('chat message', (msg) => {
+      const msgList = document.getElementById("messages");
+      const newMsg = document.createElement("li");
+      newMsg.innerHTML = `<strong>${msg.user}:</strong> ${msg.text}`;
+      msgList.appendChild(newMsg);
+      msgList.scrollTop = msgList.scrollHeight;
+    });
+
+    // ======== Lista użytkowników ========
+    socket.on('user list', (users) => {
+      const list = document.getElementById("user-list");
+      list.innerHTML = "";
+      users.forEach(u => {
+        const li = document.createElement("li");
+        li.textContent = (u === nickname) ? `${u} (Ty)` : u;
+        list.appendChild(li);
+      });
+    });
+
+    // ======== Wskaźnik "pisze..." ========
+    const input = document.getElementById("message-input");
+    input.addEventListener("input", () => {
+      if (input.value) socket.emit('typing', nickname);
+      else socket.emit('stop typing', nickname);
+    });
+
+    socket.on('typing', (nick) => {
+      document.getElementById("typing-indicator").textContent = `${nick} pisze...`;
+    });
+
+    socket.on('stop typing', () => {
+      document.getElementById("typing-indicator").textContent = "";
+    });
   </script>
 
 </body>
