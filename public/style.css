@@ -25,13 +25,17 @@ body {
   text-align: center;
 }
 
+#nickname-screen img {
+  margin-bottom: 15px;
+}
+
 #nickname-screen h2 {
   margin-bottom: 25px;
   color: #ffffff;
   font-size: 24px;
 }
 
-#nickname-input {
+#nickname-input, #room-select {
   padding: 12px;
   width: 100%;
   max-width: 320px;
@@ -129,11 +133,18 @@ body {
   color: #4caf50;
 }
 
-/* Własne wiadomości */
 #messages li.self {
-  text-align: left;
+  text-align: right;
+  color: #9be29b;
 }
 
+#messages li.system {
+  text-align: center;
+  color: #aaa;
+  font-style: italic;
+}
+
+/* === Wzmianki === */
 .mention {
   background-color: #ff9800;
   color: #000;
@@ -204,5 +215,16 @@ form button:hover {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #444;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  form input {
+    font-size: 16px;
+    padding: 10px;
+  }
+  form button {
+    font-size: 16px;
+    padding: 10px 16px;
   }
 }
