@@ -15,11 +15,6 @@
     <img src="logo.png" width="50" height="50" alt="Logo">
     <h2>Witaj w Veilo!</h2>
     <input type="text" id="nickname-input" placeholder="Twój nick..." maxlength="20" />
-    <select id="room-select">
-      <option value="main">Główny</option>
-      <option value="gaming">Gaming</option>
-      <option value="music">Muzyka</option>
-    </select>
     <button onclick="enterChat()">Dołącz</button>
   </div>
 
@@ -55,7 +50,7 @@
     function enterChat() {
       const input = document.getElementById("nickname-input");
       const nick = input.value.trim();
-      const selectedRoom = document.getElementById("room-select").value;
+      
 
       if (nick.length < 2 || nick.length > 20) {
         alert("Nick musi mieć od 2 do 20 znaków.");
@@ -63,7 +58,7 @@
       }
 
       nickname = nick;
-      room = selectedRoom;
+      
 
       document.getElementById("nickname-screen").style.display = "none";
       document.getElementById("chat-screen").style.display = "flex";
