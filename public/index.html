@@ -12,9 +12,14 @@
 
   <!-- Ekran logowania -->
   <div id="nickname-screen">
-    <img src="logo.png" width="50" height="50">
+    <img src="logo.png" width="50" height="50" alt="Logo">
     <h2>Witaj w Veilo!</h2>
-    <input type="text" id="nickname-input" placeholder="Twój nick..." />
+    <input type="text" id="nickname-input" placeholder="Twój nick..." maxlength="20" />
+    <select id="room-select">
+      <option value="main">Główny</option>
+      <option value="gaming">Gaming</option>
+      <option value="music">Muzyka</option>
+    </select>
     <button onclick="enterChat()">Dołącz</button>
   </div>
 
@@ -42,32 +47,43 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
-    const socket = io(); // połączenie z serwerem Socket.IO
+    const socket = io();
     let nickname = "";
+    let room = "main";
 
     // ======== Logowanie ========
     function enterChat() {
       const input = document.getElementById("nickname-input");
-      if (input.value.trim() !== "") {
-        nickname = input.value.trim();
+      const nick = input.value.trim();
+      const selectedRoom = document.getElementById("room-select").value;
 
-        // ukryj ekran logowania i pokaż czat
-        document.getElementById("nickname-screen").style.display = "none";
-        document.getElementById("chat-screen").style.display = "flex";
-
-        // powiadom serwer, że użytkownik dołączył
-        socket.emit('join', nickname);
+      if (nick.length < 2 || nick.length > 20) {
+        alert("Nick musi mieć od 2 do 20 znaków.");
+        return;
       }
+
+      nickname = nick;
+      room = selectedRoom;
+
+      document.getElementById("nickname-screen").style.display = "none";
+      document.getElementById("chat-screen").style.display = "flex";
+
+      socket.emit('join', { nickname, room });
     }
+
+    // Enter = dołącz
+    document.getElementById("nickname-input").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") enterChat();
+    });
 
     // ======== Wysyłanie wiadomości ========
     function sendMessage(event) {
       event.preventDefault();
       const input = document.getElementById("message-input");
       const message = input.value.trim();
+
       if (message !== "") {
-        // wyślij wiadomość do serwera
-        socket.emit('chat message', { user: nickname, text: message });
+        socket.emit('chat message', { user: nickname, text: message, room });
         input.value = "";
         socket.emit('stop typing', nickname);
       }
@@ -77,7 +93,13 @@
     socket.on('chat message', (msg) => {
       const msgList = document.getElementById("messages");
       const newMsg = document.createElement("li");
-      newMsg.innerHTML = `<strong>${msg.user}:</strong> ${msg.text}`;
+
+      // kolorowanie wzmianki
+      const formattedText = msg.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+      newMsg.innerHTML = `<strong>${msg.user}:</strong> ${formattedText}`;
+
+      if (msg.user === nickname) newMsg.classList.add("self");
+
       msgList.appendChild(newMsg);
       msgList.scrollTop = msgList.scrollHeight;
     });
@@ -94,9 +116,9 @@
     });
 
     // ======== Wskaźnik "pisze..." ========
-    const input = document.getElementById("message-input");
-    input.addEventListener("input", () => {
-      if (input.value) socket.emit('typing', nickname);
+    const inputMsg = document.getElementById("message-input");
+    inputMsg.addEventListener("input", () => {
+      if (inputMsg.value) socket.emit('typing', nickname);
       else socket.emit('stop typing', nickname);
     });
 
@@ -106,6 +128,23 @@
 
     socket.on('stop typing', () => {
       document.getElementById("typing-indicator").textContent = "";
+    });
+
+    // ======== Powiadomienia o dołączeniu / opuszczeniu ========
+    socket.on('user joined', (nick) => {
+      const msgList = document.getElementById("messages");
+      const info = document.createElement("li");
+      info.classList.add("system");
+      info.textContent = `${nick} dołączył do czatu`;
+      msgList.appendChild(info);
+    });
+
+    socket.on('user left', (nick) => {
+      const msgList = document.getElementById("messages");
+      const info = document.createElement("li");
+      info.classList.add("system");
+      info.textContent = `${nick} opuścił czat`;
+      msgList.appendChild(info);
     });
   </script>
 
