@@ -20,10 +20,14 @@
 
   <!-- Ekran czatu -->
   <div id="chat-screen" style="display: none;">
+
     <!-- Sidebar użytkowników -->
     <div id="sidebar">
       <h3>Użytkownicy</h3>
       <ul id="user-list"></ul>
+
+      <!-- Przyciski ustawień -->
+      <button id="notify-btn" class="settings-btn">Włącz powiadomienia</button>
     </div>
 
     <!-- Główna część czatu -->
@@ -63,15 +67,10 @@
 
       socket.emit('join', { nickname, room });
 
-      // Autofocus na polu wiadomości
-      const msgInput = document.getElementById("message-input");
-      msgInput.focus();
-
-      // Wyczyść pole nicku
+      document.getElementById("message-input").focus();
       input.value = "";
     }
 
-    // Enter = dołącz
     document.getElementById("nickname-input").addEventListener("keypress", (e) => {
       if (e.key === "Enter") enterChat();
     });
@@ -91,7 +90,6 @@
 
     const inputMsg = document.getElementById("message-input");
 
-    // Enter = wysyłka
     inputMsg.addEventListener("keypress", (e) => {
       if (e.key === "Enter") sendMessage(e);
     });
@@ -117,14 +115,25 @@
       strong.textContent = `${msg.user}: `;
 
       const span = document.createElement("span");
-      // Kolorowanie wzmianki @nickname
       span.innerHTML = msg.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
 
-      const liContent = document.createDocumentFragment();
-      liContent.appendChild(strong);
-      liContent.appendChild(span);
+      const frag = document.createDocumentFragment();
+      frag.appendChild(strong);
+      frag.appendChild(span);
 
-      appendMessage(liContent, msg.user === nickname ? "self" : "");
+      appendMessage(frag, msg.user === nickname ? "self" : "");
+
+      // ======== POWIADOMIENIA ========
+      if (
+        document.hidden &&
+        msg.user !== nickname &&
+        Notification.permission === "granted"
+      ) {
+        new Notification(`Nowa wiadomość od ${msg.user}`, {
+          body: msg.text,
+          icon: "logo.png"
+        });
+      }
     });
 
     // ======== Lista użytkowników ========
@@ -146,10 +155,22 @@
     });
 
     socket.on('stop typing', (nick) => {
-      // Jeżeli nick pasuje do aktualnego wskaźnika, wyczyść
       if (typingIndicator.textContent.includes(nick)) {
         typingIndicator.textContent = "";
       }
+    });
+
+    // ======== Powiadomienia – przycisk ========
+    const notifyBtn = document.getElementById("notify-btn");
+
+    notifyBtn.addEventListener("click", () => {
+      Notification.requestPermission().then((perm) => {
+        if (perm === "granted") {
+          alert("Powiadomienia zostały włączone!");
+        } else {
+          alert("Nie udzielono zgody na powiadomienia.");
+        }
+      });
     });
 
     // ======== Powiadomienia systemowe ========
