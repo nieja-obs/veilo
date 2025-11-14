@@ -21,36 +21,36 @@
   <!-- Ekran czatu -->
   <div id="chat-screen" style="display: none;">
 
-    <!-- Sidebar użytkowników -->
+    <!-- Sidebar -->
     <div id="sidebar">
       <h3>Użytkownicy</h3>
       <ul id="user-list"></ul>
-
-      <!-- Przyciski ustawień -->
       <button id="notify-btn" class="settings-btn">Włącz powiadomienia</button>
     </div>
 
-    <!-- Główna część czatu -->
+    <!-- Główna sekcja -->
     <div id="chat-main">
       <div class="header">Veilo</div>
       <ul id="messages"></ul>
+
       <div id="typing-indicator"></div>
-      <form onsubmit="sendMessage(event)">
+
+      <form id="message-form">
         <input type="text" id="message-input" placeholder="Napisz wiadomość..." autocomplete="off" />
         <button type="submit">Wyślij</button>
       </form>
     </div>
   </div>
 
-  <!-- Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
-
   <script>
     const socket = io();
     let nickname = "";
     let room = "main";
 
-    // ======== Logowanie ========
+    // =====================
+    //  Logowanie
+    // =====================
     function enterChat() {
       const input = document.getElementById("nickname-input");
       const nick = input.value.trim();
@@ -65,57 +65,78 @@
       document.getElementById("nickname-screen").style.display = "none";
       document.getElementById("chat-screen").style.display = "flex";
 
-      socket.emit('join', { nickname, room });
+      socket.emit("join", { nickname, room });
 
       document.getElementById("message-input").focus();
       input.value = "";
     }
 
-    document.getElementById("nickname-input").addEventListener("keypress", (e) => {
+    document.getElementById("nickname-input").addEventListener("keypress", e => {
       if (e.key === "Enter") enterChat();
     });
 
-    // ======== Wysyłanie wiadomości ========
-    function sendMessage(event) {
+    // =====================
+    //  Wysyłanie wiadomości
+    // =====================
+    document.getElementById("message-form").addEventListener("submit", (event) => {
       event.preventDefault();
+
       const input = document.getElementById("message-input");
       const message = input.value.trim();
 
-      if (message !== "") {
-        socket.emit('chat message', { user: nickname, text: message, room });
-        input.value = "";
-        socket.emit('stop typing', nickname);
-      }
-    }
+      if (message === "") return;
 
+      socket.emit("chat message", { user: nickname, text: message, room });
+      socket.emit("stop typing", nickname);
+
+      input.value = "";
+    });
+
+    // =====================
+    //  Wykrywanie pisania
+    // =====================
     const inputMsg = document.getElementById("message-input");
 
-    inputMsg.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") sendMessage(e);
-    });
-
-    // ======== Typing indicator ========
     inputMsg.addEventListener("input", () => {
-      if (inputMsg.value) socket.emit('typing', nickname);
-      else socket.emit('stop typing', nickname);
+      if (inputMsg.value) socket.emit("typing", nickname);
+      else socket.emit("stop typing", nickname);
     });
 
-    // ======== Odbieranie wiadomości ========
+    // =====================
+    //  Dodawanie wiadomości
+    // =====================
     function appendMessage(content, className = "") {
       const msgList = document.getElementById("messages");
       const li = document.createElement("li");
-      li.className = className;
+      if (className) li.classList.add(className);
+
       li.appendChild(content);
       msgList.appendChild(li);
       msgList.scrollTop = msgList.scrollHeight;
     }
 
-    socket.on('chat message', (msg) => {
+    // sanitize + highlight @nicków
+    function escapeHTML(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    socket.on("chat message", (msg) => {
       const strong = document.createElement("strong");
-      strong.textContent = `${msg.user}: `;
+      strong.textContent = msg.user + ": ";
 
       const span = document.createElement("span");
-      span.innerHTML = msg.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+
+      let safe = escapeHTML(msg.text);
+
+      safe = safe.replace(
+        /@([\p{L}\d_]+)/gu,
+        '<span class="mention">@$1</span>'
+      );
+
+      span.innerHTML = safe;
 
       const frag = document.createDocumentFragment();
       frag.appendChild(strong);
@@ -123,7 +144,7 @@
 
       appendMessage(frag, msg.user === nickname ? "self" : "");
 
-      // ======== POWIADOMIENIA ========
+      // powiadomienia
       if (
         document.hidden &&
         msg.user !== nickname &&
@@ -136,58 +157,72 @@
       }
     });
 
-    // ======== Lista użytkowników ========
-    socket.on('user list', (users) => {
+    // =====================
+    //  Lista użytkowników
+    // =====================
+    socket.on("user list", (users) => {
       const list = document.getElementById("user-list");
       list.innerHTML = "";
       users.forEach(u => {
         const li = document.createElement("li");
-        li.textContent = (u === nickname) ? `${u} (Ty)` : u;
+        li.textContent = u === nickname ? `${u} (Ty)` : u;
         list.appendChild(li);
       });
     });
 
-    // ======== Typing indicator ========
+    // =====================
+    //  Typing indicator — WIELE OSÓB
+    // =====================
+    let typingUsers = new Set();
     const typingIndicator = document.getElementById("typing-indicator");
 
-    socket.on('typing', (nick) => {
-      typingIndicator.textContent = `${nick} pisze...`;
+    socket.on("typing", (nick) => {
+      typingUsers.add(nick);
+      typingIndicator.textContent = [...typingUsers].join(", ") + " pisze...";
     });
 
-    socket.on('stop typing', (nick) => {
-      if (typingIndicator.textContent.includes(nick)) {
-        typingIndicator.textContent = "";
-      }
+    socket.on("stop typing", (nick) => {
+      typingUsers.delete(nick);
+      typingIndicator.textContent =
+        typingUsers.size > 0
+          ? [...typingUsers].join(", ") + " pisze..."
+          : "";
     });
 
-    // ======== Powiadomienia – przycisk ========
+    // =====================
+    //  Powiadomienia
+    // =====================
     const notifyBtn = document.getElementById("notify-btn");
 
     notifyBtn.addEventListener("click", () => {
       Notification.requestPermission().then((perm) => {
         if (perm === "granted") {
+          notifyBtn.textContent = "Powiadomienia włączone";
           alert("Powiadomienia zostały włączone!");
         } else {
+          notifyBtn.textContent = "Brak zgody";
           alert("Nie udzielono zgody na powiadomienia.");
         }
       });
     });
 
-    // ======== Powiadomienia systemowe ========
+    // =====================
+    //  Wiadomości systemowe
+    // =====================
     function appendSystemMessage(text) {
-      const li = document.createElement("li");
-      li.classList.add("system");
-      li.textContent = text;
-      appendMessage(li);
+      const span = document.createElement("span");
+      span.textContent = text;
+      appendMessage(span, "system");
     }
 
-    socket.on('user joined', (nick) => {
+    socket.on("user joined", (nick) => {
       appendSystemMessage(`${nick} dołączył do czatu`);
     });
 
-    socket.on('user left', (nick) => {
+    socket.on("user left", (nick) => {
       appendSystemMessage(`${nick} opuścił czat`);
     });
+
   </script>
 
 </body>
